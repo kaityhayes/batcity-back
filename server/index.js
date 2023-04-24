@@ -2,6 +2,7 @@ const express = require('express')
 const app = express()
 const cors = require('cors')
 const pool = require('./db')
+const pool2 = require('./db2')
 
 
 //middleware
@@ -79,6 +80,53 @@ app.delete('/bands/:id', async(req, res) => {
         console.error(err.message)
     }
 })
+
+
+//show data for second database
+app.get('/upcoming', async (req, res) => {
+    try {
+      const allUpcoming = await pool2.query('SELECT * FROM upcoming');
+      const formattedEvents = allUpcoming.rows.map(event => ({
+        title: event.name,
+        image: event.image,
+        venue: event.venue,
+        date: new Date(event.date), 
+      }));
+      res.json(formattedEvents);
+    } catch (err) {
+      console.error(err.message)
+      res.status(500).json({ error: 'Failed to retrieve events' });
+    }
+  });
+  
+  
+
+//post route for second database
+app.post('/upcoming', async (req, res) => {
+    try {
+      const { name, date, image, venue } = req.body;
+      console.log('Received request:', { name, date, image, venue });
+      const newEvent = await pool2.query('INSERT INTO upcoming(name, date, image, venue) VALUES($1, $2, $3, $4) RETURNING *', [name, date, image, venue]);
+      console.log('Inserted event:', newEvent.rows[0]);
+      const insertedEvent = newEvent.rows[0];
+      res.json({ 
+          success: true, 
+          message: 'Event created successfully',
+          event: { 
+              id: insertedEvent.upcoming_id, 
+              name: insertedEvent.name, 
+              date: insertedEvent.date,
+              image: insertedEvent.image,
+              venue: insertedEvent.venue
+          }
+      });
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).json({ error: 'Failed to create event' });
+    }
+  });
+  
+  
 
 app.listen(4000, () => {
     console.log("server is listening on port 4000")
